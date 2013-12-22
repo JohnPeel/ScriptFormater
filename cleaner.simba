@@ -1,0 +1,729 @@
+program new;
+
+//{$DEFINE DEBUG}
+{$I parser.simba}
+
+type
+  TString = String;
+  TInt32Array = array of Int32;
+  TStrArr = array of TString;
+  THashArr = array of TStrArr;
+
+procedure TString.Append(const s: String);   //Using TString because of CodeInsight issues.
+begin
+  Self := Self + s;
+end;
+
+procedure TInt32Array.Append(const x: Int32);
+begin
+  SetLength(Self, Length(Self) + 1);
+  Self[High(Self)] := x;
+end;
+
+procedure TStrArr.Append(const s: String);
+begin
+  SetLength(Self, Length(Self) + 1);
+  Self[High(Self)] := s;
+end;
+
+function TStrArr.Find(Data: String; out Index: UInt32): Boolean;
+begin
+  Data := LowerCase(Data);
+  Result := False;
+  for Index := 0 to High(Self) do
+    if (LowerCase(Self[Index]) = Data) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  Index := -1;
+end;
+
+var
+  LineCount: UInt32 = 0;
+
+function Newline(Indent: UInt8): String;
+begin
+  Inc(LineCount);
+  Result := #13#10 + Replicate(' ', Indent);
+end;
+
+function LineLength(const Data: String): UInt32;
+var
+  Data_Len: UInt32 := Length(Data);
+begin
+  Result := 0;
+  while (Result < Data_Len) and (Data[Data_Len - Result] <> #10) do
+    Inc(Result);
+  Inc(Result);
+end;
+
+function Hash(s: String): UInt32;
+var
+  I: Int32;
+begin
+  Result := 0;
+  for I := 1 to Length(s) do
+    case s[I] of
+      'a'..'z': Inc(Result, Ord(s[I]) - 96);
+      'A'..'Z': Inc(Result, Ord(s[I]) - 64);
+      '0'..'9': Inc(Result, Ord(s[I]) - 47);
+      else
+        Inc(Result, Ord(s[I]));
+    end;
+end;
+
+function THashArr.Find(const Data: String; out iHash, HashIndex: UInt32): Boolean;
+begin
+  iHash := Hash(UpperCase(Data));
+  if (iHash <= High(Self)) then
+    Result := Self[iHash].Find(Data, HashIndex);
+end;
+
+procedure THashArr.Add(const Data: String; out iHash, HashIndex: UInt32);
+begin
+  if (not (Find(Data, iHash, HashIndex))) then
+  begin
+    if (iHash > High(Self)) then
+    begin
+      {$IFDEF DEBUG}
+      WriteLn('Increasing size of HashArr to ', iHash + 1, '.');
+      {$ENDIF}
+      SetLength(Self, iHash + 1);
+    end;
+
+    {$IFDEF DEBUG}
+    WriteLn('Adding "', Data, '" to HashArr[', iHash, '] (', Self[iHash], ').');
+    {$ENDIF}
+    Self[iHash].Append(Data);
+    HashIndex := High(Self[iHash]);
+  end;
+end;
+
+procedure THashArr.Fill();
+var
+  iHash, HashIndex, Temp: UInt32;
+  Data: String;
+  DataArr: array of String;
+begin
+  if (Length(Self) < 492) then
+    SetLength(Self, 492);
+  
+  Data := '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';
+  		  
+  DataArr := Explode(' ', DecompressString(Base64Decode(Data)));
+  for Temp := 0 to High(DataArr) do
+    Add(DataArr[Temp], iHash, HashIndex);
+  
+  Data := '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';
+    
+  DataArr := Explode(' ', DecompressString(Base64Decode(Data)));
+  for Temp := 0 to High(DataArr) do
+    Add(DataArr[Temp], iHash, HashIndex);
+end;
+
+var
+  HashArr: THashArr;
+
+function CleanUp(const Script: String; const SkipErrors: Boolean = False; const FixWarnings: Boolean = False; const IgnoreComments: Boolean = False): String;
+var
+  Parser: TParser;
+  LastToken, Token: TToken;
+  iHash, HashIndex: UInt32;
+  Indent, IdentIndent, NewLineCount: Int8;
+  inPar, TempInt32: Int32;
+  inCase, inMethod, TempIndent: TInt32Array;
+  inMethodNames, TempNameArr: TStrArr;
+  TempName: string;
+  TempParser: TParser;
+  TempToken: TToken;
+begin
+  Parser.Init(Script);
+  LineCount := 0;
+  
+  Indent := IdentIndent := NewLineCount := 0;
+  SetLength(inCase, 0);
+  SetLength(inMethod, 0);
+  SetLength(TempIndent, 0);
+  Result := '';
+  
+  while (Parser.Next() <> tk_NULL) do
+  begin
+    if (Token.Token <> tk_NewLine) and (Token.Token <> tk_WhiteSpace) then
+      LastToken := Token;
+    Token := Parser.getToken();
+    
+    if (Token.Token <> tk_NewLine) and (Token.Token <> tk_WhiteSpace) then
+      NewLineCount := 0;
+    
+    case Token.Token of
+      tk_Error: 
+        begin
+          WriteLn('ERROR: Found unknown character "', Token.Data, '" at position ', Token.Column, ' on line ', Token.Line, '.');
+          if (not SkipErrors) then
+            Break;
+        end;
+      
+      tk_WhiteSpace: ;
+      tk_NewLine: 
+        begin
+          Inc(NewLineCount);
+          if (NewLineCount = 2) and (Length(inMethod) > 0) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      
+      tk_Identifier: 
+        begin
+          SetLength(TempNameArr, 0);
+
+          if (Length(inMethodNames) > 0) then
+            for TempInt32 := High(inMethodNames) downto 0 do
+              TempNameArr.Append(inMethodNames[TempInt32]);
+
+          TempNameArr.Append(Trim(Token.Data));
+
+          if (LastToken.Token.ToStr() in ['Function', 'Procedure']) then
+            inMethodNames.Append(Trim(Token.Data));
+
+          TempName := Implode('->', TempNameArr);
+
+          if (not (HashArr.Find(TempName, iHash, HashIndex))) then
+            if (not (HashArr.Find(TempNameArr[High(TempNameArr)], iHash, HashIndex))) then
+              HashArr.Add(TempName, iHash, HashIndex)
+
+          if (TempName <> HashArr[iHash][HashIndex]) and (TempNameArr[High(TempNameArr)] <> HashArr[iHash][HashIndex]) then
+          begin
+            WriteLn('WARNING: Case mismatch (', TempName, ' <> ', HashArr[iHash][HashIndex], ') on line ', Token.Line, ':', LineCount, '.');
+            if (FixWarnings) then
+            begin
+              Token.Data := HashArr[iHash][HashIndex];
+              while ((TempInt32 := Pos('->', Token.Data)) > 0) do
+                Token.Data := Copy(Token.Data, TempInt32 + 2, Length(Token.Data) - (TempInt32 + 1));
+            end;
+          end;
+          
+          if (LastToken.Token.ToStr() in ['Var', 'Const', 'Type', 'SemiColon', 'Record', 'Union', 'Comment']) then
+            Result.Append(Replicate(' ', IdentIndent * 2));
+          
+          Result.Append(Trim(Token.Data));
+        end;
+      tk_typ_Float, tk_typ_Integer, tk_typ_String, tk_typ_Char: Result.Append(Trim(Token.Data));
+      tk_Comment: 
+        begin
+          if (not IgnoreComments) then
+          begin
+            if (Indent = 0) and (Token.Column = 1) then
+              if ((LastToken.Token <> tk_Directive) and (LastToken.Token <> tk_Comment)) and (not (Length(inMethod) > 0)) then
+                Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+
+            if (Copy(Trim(Token.Data), 1, 2) = '//') then
+            begin
+              Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) - 1));
+              
+              if (LastToken.Line = Token.Line) then
+              begin
+                Delete(Result, Length(Result) - 1);
+                Dec(LineCount);
+                Result.Append(Replicate(' ', (Token.Column - LineLength(Result))));
+              end else
+                Result.Append(Replicate(' ', Token.Column - 1));
+            end;
+            Result.Append(Trim(Token.Data) + Newline((Indent + Length(TempIndent)) * 2));
+          end;
+        end;
+      tk_Directive: 
+        begin
+          if ((LastToken.Token <> tk_Directive) and (LastToken.Token <> tk_Comment)) and (not (Length(inMethod) > 0)) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          Result.Append(Trim(Token.Data) + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      
+      tk_kw_Array: Result.Append('array');
+      tk_kw_Begin: 
+        begin
+          if (IdentIndent > 0) then
+            IdentIndent := 0;
+
+          if (Length(inMethod) > 0) and (inMethod[High(inMethod)] = Indent) then
+            if (not (LastToken.Token.ToStr() in ['NULL', 'SemiColon', 'Comment'])) then
+              Result.Append(';')
+
+          if (Indent = 0) and (Length(inMethod) = 0) then
+          begin
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+            inMethod.Append(Indent);
+          end;
+          
+          if (Length(inCase) > 0) and (inCase[High(inCase)] = Indent) then
+            Inc(Indent);
+          
+          if (LastToken.Token = tk_sym_Colon) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          
+          if (Length(TempIndent) > 0) then
+            if (Indent = TempIndent[High(TempIndent)]) then
+            begin
+              Delete(Result, Length(Result) - 1);
+              SetLength(TempIndent, Length(TempIndent) - 1);
+            end;
+          
+          Inc(Indent);
+          Result.Append('begin' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Case: 
+        begin
+          Inc(Indent);
+          if (LastToken.Token = tk_sym_Colon) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          
+          if (Length(inCase) > 0) and (inCase[High(inCase)] = Indent - 1) then
+            Inc(Indent);
+          
+          inCase.Append(Indent);
+          
+          Result.Append('case ');
+        end;
+      tk_kw_Const: 
+        begin
+          if (inPar = 0) and (LastToken.Token.ToStr() in ['SemiColon', 'Comment', 'Directive']) and (not Length(inMethod) > 0) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          
+          Result.Append('const');
+          
+          if (inPar = 0) then
+          begin
+            IdentIndent := 1;
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          end else
+            Result.Append(' ');
+        end;
+      tk_kw_Do: 
+        begin
+          SetLength(TempIndent, Length(TempIndent) + 1);
+          TempIndent[High(TempIndent)] := Indent;
+          Result.Append(' do' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_DownTo: Result.Append(' downto ');
+      tk_kw_Else: 
+        begin
+          if (LastToken.Token <> tk_kw_End) then
+          begin
+            if (LastToken.Token <> tk_sym_SemiColon) then
+            begin
+              if (Length(TempIndent) > 0) then
+                if (TempIndent[High(TempIndent)] = Indent) then
+                  SetLength(TempIndent, Length(TempIndent) - 1);
+              
+              Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+            end else
+              if (not (Length(inCase) > 0)) then
+              begin
+                WriteLn('WARNING: SemiColon before Else at ', Token.Column, ':', Token.Line, '.');
+                if (FixWarnings) then
+                  WriteLn('Not fixed!');
+              end;
+          end else
+            Result.Append(' ');
+          
+          SetLength(TempIndent, Length(TempIndent) + 1);
+          TempIndent[High(TempIndent)] := Indent;
+          Result.Append('else' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_End: 
+        begin
+          Dec(Indent);
+          
+          if (Length(inCase) > 0) then
+            for TempInt32 := High(inCase) downto 0 do
+            begin
+              if (inCase[TempInt32] in [Indent, Indent - 1]) then
+                Dec(Indent);
+              
+              if (inCase[TempInt32] = Indent + 1) then
+                SetLength(inCase, Length(inCase) - 1)
+              else
+                Break;
+            end;
+          
+          if (Length(inMethod) > 0) and (inMethod[High(inMethod)] = Indent) then
+          begin
+            SetLength(inMethod, Length(inMethod) - 1);
+            SetLength(inMethodNames, Length(inMethodNames) - 1);
+            if (Length(inMethod) > 0) then
+              Dec(Indent);
+          end;
+          
+          Delete(Result, Length(Result) - 1);
+          Result.Append(Replicate(' ', IdentIndent * 2) + 'end');
+        end;
+      tk_kw_Except: 
+        begin
+          Delete(Result, Length(Result) - 1);
+          Result.Append('except' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_External: Result.Append('external');
+      tk_kw_Finally: 
+        begin
+          Delete(Result, Length(Result) - 1);
+          Result.Append('finally' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_For: Result.Append('for ');
+      tk_kw_Forward: Result.Append(' forward');
+      tk_kw_Function: 
+        begin
+          if (LastToken.Token <> tk_sym_Colon) then
+          begin
+            if (not (LastToken.Token.ToStr() in ['Comment', 'SemiColon', 'NULL'])) then
+            begin
+              WriteLn('WARNING: No SemiColon before Function at ', Token.Column, ':', Token.Line, '.');
+              if (FixWarnings) then
+              begin
+                Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
+                Result.Append(';' + Newline((Indent + Length(TempIndent)) * 2));
+              end;
+            end;
+            
+            if (Length(inMethod) = 0) and (LastToken.Token <> tk_Comment) then
+              Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+            
+            IdentIndent := 0;
+            
+            if (Length(inMethod) > 0) then
+            begin
+              Inc(Indent);
+              Result.Append('  ');
+            end;
+            
+            inMethod.Append(Indent);
+          end;
+          
+          Result.Append('function');
+          
+          if (LastToken.Token <> tk_sym_Colon) then
+            Result.Append(' ');
+        end;
+      tk_kw_Goto: Result.Append('goto ');
+      tk_kw_If: Result.Append('if ');
+      tk_kw_Label: 
+        begin
+          TempIndent.Append(Indent);
+          Result.Append('label ' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Native: Result.Append(' native');
+      tk_kw_Of: 
+        begin
+          Result.Append(' of');
+          if (inPar > 0) or (IdentIndent > 0) then
+            Result.Append(' ')
+          else
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Object: Result.Append(' object');
+      tk_kw_Out: Result.Append('out ');
+      tk_kw_Overload: 
+        begin
+          Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
+          Dec(LineCount);
+          Result.Append(' overload');
+        end;
+      tk_kw_Override: 
+        begin
+          Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
+          Dec(LineCount);
+          Result.Append(' override');
+        end;
+      tk_kw_Packed: Result.Append(' packed');
+      tk_kw_Private: Result.Append('private');
+      tk_kw_Procedure: 
+        begin
+          if (LastToken.Token <> tk_sym_Colon) then
+          begin
+            if (not (LastToken.Token.ToStr() in ['Comment', 'SemiColon'])) then
+            begin
+              WriteLn('WARNING: No SemiColon before Procedure at ', Token.Column, ':', Token.Line, '.');
+              if (FixWarnings) then
+              begin
+                Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
+                Result.Append(';' + Newline((Indent + Length(TempIndent)) * 2));
+              end;
+            end;
+            
+            if (Length(inMethod) = 0) and (LastToken.Token <> tk_Comment) then
+              Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+            
+            IdentIndent := 0;
+
+            if (Length(inMethod) > 0) then
+            begin
+              Inc(Indent);
+              Result.Append('  ');
+            end;
+
+            inMethod.Append(Indent);
+          end;
+          
+          Result.Append('procedure');
+          
+          if (LastToken.Token <> tk_sym_Colon) then
+            Result.Append(' ');
+        end;
+      tk_kw_Program: Result.Append('program ');
+      tk_kw_Record: 
+        begin
+          Inc(Indent);
+          if (inPar > 0) then
+            Result.Append(' ');
+          Result.Append('record' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Repeat: 
+        begin
+          Inc(Indent);
+          Result.Append('repeat' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Set: Result.Append('set ');
+      tk_kw_Then: 
+        begin
+          TempIndent.Append(Indent);
+          Result.Append(' then');
+          
+          TempParser := Parser;
+          repeat
+            case TempParser.NextNoJunk() of
+              tk_kw_Begin, tk_kw_Else: Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+              tk_sym_SemiColon: 
+                begin
+                  TempToken := TempParser.getToken();
+                  if (TempToken.Column > 81) or (TempToken.Line > Token.Line) then
+                    Result.Append(Newline((Indent + Length(TempIndent)) * 2))
+                  else
+                    Result.Append(' ');
+                end;
+              else
+                Continue;
+            end;
+            Break;
+          until (False);
+        end;
+      tk_kw_To: Result.Append(' to ');
+      tk_kw_Try: 
+        begin
+          Inc(Indent);
+          Result.Append('try' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Type: 
+        begin
+          if (LastToken.Token.ToStr() in ['SemiColon', 'Comment', 'Directive']) and (not (Length(inMethod) > 0)) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          
+          if (LastToken.Token = tk_kw_Of) then
+            Result.Append(' ')
+          else
+            IdentIndent := 1;
+          
+          Result.Append('type');
+          if (LastToken.Token <> tk_kw_Of) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Union: 
+        begin
+          Inc(Indent);
+          if (inPar > 0) then
+            Result.Append(' ');
+          Result.Append('union' + Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_kw_Until: 
+        begin
+          Dec(Indent);
+          Delete(Result, Length(Result) - 1);
+          Result.Append('until ');
+        end;
+      tk_kw_Var: 
+        begin
+          if (inPar = 0) and (LastToken.Token.ToStr() in ['SemiColon', 'Comment', 'Directive']) and (not (Length(inMethod) > 0)) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          
+          Result.Append('var');
+          
+          if (inPar = 0) and (((Length(inMethod) > 0) and (Indent = inMethod[High(inMethod)])) or ((Length(inMethod) = 0) and (Indent = 0))) then
+          begin
+            IdentIndent := 1;
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          end else
+            Result.Append(' ');
+        end;
+      tk_kw_While: Result.Append('while ');
+      tk_kw_With: Result.Append('with ');
+      
+      tk_cmp_Equal: Result.Append(' = ');
+      tk_cmp_GreaterThan: Result.Append(' > ');
+      tk_cmp_GreaterThanOrEqual: Result.Append(' >= ');
+      tk_cmp_LessThan: Result.Append(' < ');
+      tk_cmp_LessThanOrEqual: Result.Append(' <= ');
+      tk_cmp_NotEqual: Result.Append(' <> ');
+      
+      tk_op_Addr: Result.Append('@');
+      tk_op_AND: Result.Append(' and ');
+      tk_op_Assign: Result.Append(' := ');
+      tk_op_Deref: Result.Append('^');
+      tk_op_DIV: Result.Append(' div ');
+      tk_op_Divide: Result.Append(' / ');
+      tk_op_Dot: Result.Append('.');
+      tk_op_IN: Result.Append(' in ');
+      tk_op_Index: Result.Append('[');
+      tk_op_Minus: 
+        begin
+          if (LastToken.Token.ToStr() in ['Identifier', 'Float', 'Integer', 'ParenthesisClose']) then
+            Result.Append(' - ')
+          else
+            Result.Append('-');
+        end;
+      tk_op_MOD: Result.Append(' mod ');
+      tk_op_Multiply: Result.Append(' * ');
+      tk_op_NOT: Result.Append('not ');
+      tk_op_OR: Result.Append(' or ');
+      tk_op_Plus: Result.Append(' + ');
+      tk_op_Power: Result.Append(' ** ');
+      tk_op_SHL: Result.Append(' shl ');
+      tk_op_SHR: Result.Append(' shr ');
+      tk_op_XOR: Result.Append(' xor ');
+      
+      tk_sym_BracketClose: Result.Append(']');
+      tk_sym_Colon: 
+        begin
+          Result.Append(': ');
+          
+          if (Length(inMethod) > 0) and (Indent > inMethod[High(inMethod)]) and (inPar = 0) and (IdentIndent = 0) then
+            if (not ((Length(inCase) > 0) and (inCase[High(inCase)] = Indent))) then
+              Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+        end;
+      tk_sym_Comma: Result.Append(', ');
+      tk_sym_DotDot: Result.Append('..');
+      tk_sym_ParenthesisClose: 
+        begin
+          Dec(inPar);
+          Result.Append(')');
+        end;
+      tk_sym_ParenthesisOpen: 
+        begin
+          Inc(inPar);
+          Result.Append('(');
+        end;
+      tk_sym_SemiColon: 
+        begin
+          if (Length(TempIndent) > 0) then
+            for TempInt32 := High(TempIndent) downto 0 do
+              if (TempIndent[TempInt32] = Indent) then
+                SetLength(TempIndent, Length(TempIndent) - 1)
+              else
+                Break;
+          
+          Result.Append(';');
+          if (inPar = 0) then
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2))
+          else
+            Result.Append(' ');
+        end;
+    end;
+  end;
+  
+  if (Indent <> 0) then
+    WriteLn('WARNING: Script didn''t end with an Indent level of 0.');
+end;
+
+var
+  Script: TStringList;
+  Tick: UInt64;
+  iHash, HashIndex: UInt32;
+
+begin
+  Tick := GetTickCount();
+  
+  HashArr.Fill();
+  HashArr.Add('WriteLn', iHash, HashIndex); //Most people like Writeln, but I personally like WriteLn
+
+  WriteLn('It took me ', GetTickCount() - Tick, 'ms to fill the HashArr with default data.');
+  Tick := GetTickCount();
+
+  Script.Init();
+  Script.LoadFromFile(ScriptPath + 'script.simba');
+  Script.setText(CleanUp(Script.getText(), False, True));
+  Script.SaveToFile(ScriptPath + 'script-cleaned.simba');
+  Script.Free();
+
+  WriteLn('It took me ', GetTickCount() - Tick, 'ms to parse and clean this script.');
+end.

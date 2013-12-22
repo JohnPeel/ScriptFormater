@@ -1,0 +1,71 @@
+program new;
+
+var
+  Data: string;
+
+const
+  ltString = 0;
+  ps_mouse_right = 0;
+  ps_mouse_left = 0;
+  ps_mouse_middle = 0;
+
+type
+  TVar = record
+    isConstant: boolean;
+  end;
+
+function addGlobalVar(const t: UInt8; const Name: string): TVar;
+begin
+  Data := Data + Name + ' ';
+end;
+
+procedure addGlobalType(const t, Name: string);
+begin
+  Data := Data + Name + ' ';
+end;
+
+procedure SetCurrSection(const s: string);
+begin
+end;
+
+procedure AddGlobalFunc(const Name: string; const P: Pointer);
+  function MethodName(const Name: string): string;
+  begin
+    Result := Name;
+    Delete(Result, 1, Pos(' ', Result));
+    Delete(Result, Pos('(', Result));
+    Delete(Result, Pos(':', Result));
+    Delete(Result, Pos(';', Result));
+  end;
+begin
+  Data := Data + Trim(MethodName(Name)) + ' ';
+end;
+
+procedure FormatData();
+var
+  I: UInt32;
+begin
+  Data := Base64Encode(CompressString(Data));
+  for I := 1 to Length(Data) with 66 do
+  begin
+    if (I > 1) then
+      Write('          ')
+    else
+      Write('  Data := ');
+    Write(#39 + Copy(Data, I, 66) + #39);
+    if (I < Length(Data) - 66) then
+      WriteLn(' +')
+    else
+      WriteLn(';');
+  end;
+end;
+
+begin
+  Data := '';
+
+  {$I lpcompile.inc}
+  {$I lpexportedmethods.inc}
+  Delete(Data, Length(Data));
+
+  FormatData();
+end.

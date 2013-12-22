@@ -1,0 +1,529 @@
+
+type
+  EParserToken = (
+    tk_NULL,
+    tk_Error,
+    tk_Identifier,
+    tk_Comment,
+    tk_Directive,
+    tk_WhiteSpace,
+    tk_NewLine,
+
+    tk_kw_Array,
+    tk_kw_Begin,
+    tk_kw_Case,
+    tk_kw_Const,
+    tk_kw_Do,
+    tk_kw_DownTo,
+    tk_kw_Else,
+    tk_kw_End,
+    tk_kw_Except,
+    tk_kw_External,
+    tk_kw_Finally,
+    tk_kw_For,
+    tk_kw_Forward,
+    tk_kw_Function,
+    tk_kw_Goto,
+    tk_kw_If,
+    tk_kw_Label,
+    tk_kw_Native,
+    tk_kw_Of,
+    tk_kw_Object,
+    tk_kw_Out,
+    tk_kw_Overload,
+    tk_kw_Override,
+    tk_kw_Packed,
+    tk_kw_Private,
+    tk_kw_Procedure,
+    tk_kw_Program,
+    tk_kw_Record,
+    tk_kw_Repeat,
+    tk_kw_Set,
+    tk_kw_Then,
+    tk_kw_To,
+    tk_kw_Try,
+    tk_kw_Type,
+    tk_kw_Union,
+    tk_kw_Until,
+    tk_kw_Var,
+    tk_kw_While,
+    tk_kw_With,
+
+    tk_cmp_Equal,
+    tk_cmp_GreaterThan,
+    tk_cmp_GreaterThanOrEqual,
+    tk_cmp_LessThan,
+    tk_cmp_LessThanOrEqual,
+    tk_cmp_NotEqual,
+
+    tk_op_Addr,
+    tk_op_AND,
+    tk_op_Assign,
+    tk_op_Deref,
+    tk_op_DIV,
+    tk_op_Divide,
+    tk_op_Dot,
+    tk_op_IN,
+    tk_op_Index,
+    tk_op_Minus,
+    tk_op_MOD,
+    tk_op_Multiply,
+    tk_op_NOT,
+    tk_op_OR,
+    tk_op_Plus,
+    tk_op_Power,
+    tk_op_SHL,
+    tk_op_SHR,
+    tk_op_XOR,
+
+    tk_sym_BracketClose,
+    tk_sym_Colon,
+    tk_sym_Comma,
+    tk_sym_DotDot,
+    tk_sym_ParenthesisClose,
+    tk_sym_ParenthesisOpen,
+    tk_sym_SemiColon,
+
+    tk_typ_Float,
+    tk_typ_Integer,
+    tk_typ_String,
+    tk_typ_Char
+  );
+
+const
+  tk_sym_BracketOpen = tk_op_Index;
+  tk_sym_Caret = tk_op_Deref;
+  tk_sym_Dot = tk_op_Dot;
+  tk_sym_Equals = tk_cmp_Equal;
+  tk_Unknown = tk_Error;
+
+function EParserToken.ToStr(): String;
+begin
+  Result := ToString(Self);
+  Delete(Result, 1, 3);
+  Delete(Result, 1, Pos('_', Result));
+end;
+
+type
+  TParser = record
+    FDoc: String;
+    FTokenPos, FPos: UInt32;
+    FLineNumber, FLinePos: UInt32;
+    FDoc_Len: UInt32;
+    FToken: EParserToken;
+  end;
+  TToken = record
+    Token: EParserToken;
+    Data: String;
+    Pos, Line, Column: UInt32;
+  end;
+
+procedure TParser.Newline();
+begin
+  if (FDoc[FPos] = #13) and (FDoc[FPos + 1] = #10) then
+    Inc(FPos);
+  
+  Inc(FPos);
+  Inc(FLineNumber);
+  
+  FLinePos := FPos - 1;
+  FToken := tk_NewLine;
+end;
+
+procedure TParser.Space();
+begin
+  Inc(FPos);
+  while (FDoc[FPos] in [#1..#9, #11, #12, #14..#32]) do
+    Inc(FPos);
+  
+  FToken := tk_WhiteSpace;
+end;
+
+procedure TParser.AsciiChar();
+begin
+  Inc(FPos);
+  
+  if (FDoc[FPos] = '$') then
+  begin
+    while (FDoc[FPos] in ['0'..'9', 'a'..'z', 'A'..'Z']) do
+      Inc(FPos);
+  end else
+    while (FDoc[FPos] in ['0'..'9']) do
+      Inc(FPos);
+  
+  FToken := tk_typ_Char;
+end;
+
+procedure TParser.Int();
+begin
+  Inc(FPos);
+  while (FDoc[FPos] in ['0'..'9', 'a'..'z', 'A'..'Z']) do
+    Inc(FPos);
+  
+  FToken := tk_typ_Integer;
+end;
+
+procedure TParser.Str();
+begin
+  Inc(FPos);
+  while (FDoc[FPos] <> #39) do
+  begin
+    if (FDoc[FPos] in [#10, #13]) then
+      Break;
+    
+    Inc(FPos);
+  end;
+  
+  if (FDoc[FPos] = #39) then
+    Inc(FPos);
+  
+  FToken := tk_typ_String;
+  
+  if (FPos - FTokenPos = 3) then
+    FToken := tk_typ_Char;
+end;
+
+procedure TParser.Number();
+begin
+  Inc(FPos);
+  FToken := tk_typ_Integer;
+  while (FDoc[FPos] in ['0'..'9', '.']) do
+  begin
+    if (FDoc[FPos] = '.') then
+      if (FDoc[FPos + 1] = '.') then
+        Break
+      else
+        FToken := tk_typ_Float;
+    Inc(FPos);
+  end;
+end;
+
+procedure TParser.Ident();
+begin
+  Inc(FPos);
+  while (FDoc[FPos] in ['a'..'z', 'A'..'Z', '0'..'9', '_']) do
+    Inc(FPos);
+  
+  case LowerCase(Copy(FDoc, FTokenPos, FPos - FTokenPos)) of
+    'array': FToken := tk_kw_Array;
+    'and': FToken := tk_op_AND;
+    'begin': FToken := tk_kw_Begin;
+    'case': FToken := tk_kw_Case;
+    'const': FToken := tk_kw_Const;
+    'div': FToken := tk_op_DIV;
+    'do': FToken := tk_kw_Do;
+    'downto': FToken := tk_kw_DownTo;
+    'else': FToken := tk_kw_Else;
+    'end': FToken := tk_kw_End;
+    'except': FToken := tk_kw_Except;
+    'external': FToken := tk_kw_External;
+    'finally': FToken := tk_kw_Finally;
+    'for': FToken := tk_kw_For;
+    'forward': FToken := tk_kw_Forward;
+    'function': FToken := tk_kw_Function;
+    'goto': FToken := tk_kw_Goto;
+    'if': FToken := tk_kw_If;
+    'in': FToken := tk_op_IN;
+    'label': FToken := tk_kw_Label;
+    'mod': FToken := tk_op_MOD;
+    'native': FToken := tk_kw_Native;
+    'not': FToken := tk_op_NOT;
+    'object': FToken := tk_kw_Object;
+    'of': FToken := tk_kw_Of;
+    'or': FToken := tk_op_OR;
+    'out': FToken := tk_kw_Out;
+    'overload': FToken := tk_kw_Overload;
+    'override': FToken := tk_kw_Override;
+    'packed': FToken := tk_kw_Packed;
+    'private': FToken := tk_kw_Private;
+    'procedure': FToken := tk_kw_Procedure;
+    'program': FToken := tk_kw_Program;
+    'record': FToken := tk_kw_Record;
+    'repeat': FToken := tk_kw_Repeat;
+    'set': FToken := tk_kw_Set;
+    'shl': FToken := tk_op_SHL;
+    'shr': FToken := tk_op_SHR;
+    'then': FToken := tk_kw_Then;
+    'to': FToken := tk_kw_To;
+    'try': FToken := tk_kw_Try;
+    'type': FToken := tk_kw_Type;
+    'union': FToken := tk_kw_Union;
+    'until': FToken := tk_kw_Until;
+    'var': FToken := tk_kw_Var;
+    'while': FToken := tk_kw_While;
+    'with': FToken := tk_kw_With;
+    'xor': FToken := tk_op_XOR;
+    else
+      FToken := tk_Identifier;
+  end;
+end;
+
+procedure TParser.BraceOpen();
+begin
+  Inc(FPos);
+  FToken := tk_Comment;
+  if (FDoc[FPos] in ['$', '.']) then
+    FToken := tk_Directive;
+  
+  while (FDoc[FPos] <> '}') do
+  begin
+    Inc(FPos);
+    
+    if (FDoc[FPos] in [#10, #13]) then
+    begin
+      Inc(FPos);
+      Inc(FLineNumber);
+      
+      if (FDoc[FPos] = #10) then
+        Inc(FPos);
+      
+      FLinePos := FPos - 1;
+    end;
+  end;
+  
+  Inc(FPos);
+end;
+
+procedure TParser.Error();
+begin
+  Inc(FPos);
+  FToken := tk_Error;
+end;
+
+procedure TParser.RoundOpen();
+begin
+  Inc(FPos);
+  FToken := tk_sym_ParenthesisOpen;
+end;
+
+procedure TParser.RoundClose();
+begin
+  Inc(FPos);
+  FToken := tk_sym_ParenthesisClose;
+end;
+
+procedure TParser.Star();
+begin
+  Inc(FPos);
+  FToken := tk_op_Multiply;
+  
+  if (FDoc[FPos] = '*') then
+  begin
+    Inc(FPos);
+    FToken := tk_op_Power;
+  end;
+end;
+
+procedure TParser.Plus();
+begin
+  Inc(FPos);
+  FToken := tk_op_Plus;
+end;
+
+procedure TParser.Comma();
+begin
+  Inc(FPos);
+  FToken := tk_sym_Comma;
+end;
+
+procedure TParser.Minus();
+begin
+  Inc(FPos);
+  FToken := tk_op_Minus;
+end;
+
+procedure TParser.Point();
+begin
+  Inc(FPos);
+  FToken := tk_sym_Dot;
+  
+  if (FDoc[FPos] = '.') then
+  begin
+    Inc(FPos);
+    FToken := tk_sym_DotDot;
+  end;
+end;
+
+procedure TParser.Slash();
+begin
+  Inc(FPos);
+  FToken := tk_op_Divide;
+  
+  if (FDoc[FPos] = '/') then
+  begin
+    Inc(FPos);
+    
+    while (not (FDoc[FPos] in [#10, #13])) do
+      Inc(FPos);
+    
+    if (FDoc[FPos] = #10) then
+      Inc(FPos);
+    
+    FToken := tk_Comment;
+  end;
+end;
+
+procedure TParser.Colon();
+begin
+  Inc(FPos);
+  FToken := tk_sym_Colon;
+  if (FDoc[FPos] = '=') then
+  begin
+    Inc(FPos);
+    FToken := tk_op_Assign;
+  end;
+end;
+
+procedure TParser.SemiColon();
+begin
+  Inc(FPos);
+  FToken := tk_sym_SemiColon;
+end;
+
+procedure TParser.Lower();
+begin
+  Inc(FPos);
+  FToken := tk_cmp_LessThan;
+  
+  if (FDoc[FPos] = '>') then
+  begin
+    Inc(FPos);
+    FToken := tk_cmp_NotEqual;
+  end;
+  
+  if (FDoc[FPos] = '=') then
+  begin
+    Inc(FPos);
+    FToken := tk_cmp_LessThanOrEqual;
+  end;
+end;
+
+procedure TParser.Equal();
+begin
+  Inc(FPos);
+  FToken := tk_cmp_Equal;
+end;
+
+procedure TParser.Greater();
+begin
+  Inc(FPos);
+  FToken := tk_cmp_GreaterThan;
+  
+  if (FDoc[FPos] = '=') then
+  begin
+    Inc(FPos);
+    FToken := tk_cmp_GreaterThanOrEqual;
+  end;
+end;
+
+procedure TParser.Address();
+begin
+  Inc(FPos);
+  FToken := tk_op_Addr;
+end;
+
+procedure TParser.SquareOpen();
+begin
+  Inc(FPos);
+  FToken := tk_sym_BracketOpen;
+end;
+
+procedure TParser.SquareClose();
+begin
+  Inc(FPos);
+  FToken := tk_sym_BracketClose;
+end;
+
+procedure TParser.Ptr();
+begin
+  Inc(FPos);
+  FToken := tk_op_Deref;
+end;
+
+procedure TParser.Unknown();
+begin
+  Inc(FPos);
+  FToken := tk_Unknown;
+end;
+
+function TParser.Next(): EParserToken;
+begin
+  FToken := tk_NULL;
+  FTokenPos := FPos;
+  
+  if (FTokenPos > FDoc_Len) then
+    Exit(FToken);
+  
+  case FDoc[FPos] of
+    #0: FToken := tk_NULL;
+    #10, #13: Newline();
+    #1..#9, #11, #12, #14..#32: Space();
+    '#': AsciiChar();
+    '$': Int();
+    #39: Str();
+    '0'..'9': Number();
+    'a'..'z', 'A'..'Z', '_': Ident();
+    '{': BraceOpen();
+    '}': Error();
+    '!', '"', '%', '&', '('..'/', ':'..'@', '['..'^', '`', '~': 
+      case FDoc[FPos] of
+        '(': RoundOpen();
+        ')': RoundClose();
+        '*': Star();
+        '+': Plus();
+        ',': Comma();
+        '-': Minus();
+        '.': Point();
+        '/': Slash();
+        ':': Colon();
+        ';': SemiColon();
+        '<': Lower();
+        '=': Equal();
+        '>': Greater();
+        '@': Address();
+        '[': SquareOpen();
+        ']': SquareClose();
+        '^': Ptr();
+        else
+          Unknown();
+      end;
+    else
+      Unknown();
+  end;
+  
+  Result := FToken;
+end;
+
+function TParser.NextNoJunk(): EParserToken;
+begin
+  repeat
+    Result := Next();
+  until (not (Result.ToStr() in ['WhiteSpace', 'NewLine', 'Comment', 'Directive']));
+end;
+
+function TParser.NextNoSpace(): EParserToken;
+begin
+  repeat
+    Result := Next();
+  until (not (Result.ToStr() in ['WhiteSpace', 'NewLine']));
+end;
+
+function TParser.getToken(): TToken;
+begin
+  Result.Token := FToken;
+  Result.Pos := FPos;
+  Result.Line := FLineNumber;
+  Result.Column := FTokenPos - FLinePos;
+  Result.Data := Copy(FDoc, FTokenPos, FPos - FTokenPos);
+end;
+
+procedure TParser.Init(Script: String);
+begin
+  FDoc := Script + #0;
+  FTokenPos := -1;
+  FPos := 1;
+  FLineNumber := 1;
+  FLinePos = 0;
+  FDoc_Len := Length(FDoc);
+  FToken := tk_Unknown;
+end;
