@@ -523,7 +523,7 @@ begin
   FTokenPos := -1;
   FPos := 1;
   FLineNumber := 1;
-  FLinePos = 0;
+  FLinePos := 0;
   FDoc_Len := Length(FDoc);
   FToken := tk_Unknown;
 end;
