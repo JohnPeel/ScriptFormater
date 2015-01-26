@@ -271,7 +271,7 @@ begin
 
           if (not (HashArr.Find(TempName, iHash, HashIndex))) then
             if (not (HashArr.Find(TempNameArr[High(TempNameArr)], iHash, HashIndex))) then
-              HashArr.Add(TempName, iHash, HashIndex)
+              HashArr.Add(TempName, iHash, HashIndex);
 
           if (TempName <> HashArr[iHash][HashIndex]) and (TempNameArr[High(TempNameArr)] <> HashArr[iHash][HashIndex]) then
           begin
@@ -336,7 +336,7 @@ begin
 
           if (Length(inMethod) > 0) and (inMethod[High(inMethod)] = Indent) then
             if (not (LastToken.Token.ToStr() in ['NULL', 'SemiColon', 'Comment'])) then
-              Result.Append(';')
+              Result.Append(';');
 
           if (Indent = 0) and (Length(inMethod) = 0) then
           begin
@@ -499,8 +499,13 @@ begin
             Result.Append(' ');
         end;
       tk_kw_Goto: Result.Append('goto ');
-      tk_kw_If: Result.Append('if ');
-      tk_kw_Label: 
+      tk_kw_If:
+        begin
+          if (not (LastToken.Token.ToStr() in ['Begin', 'Comment', 'Directive', 'Else', 'Do', 'Of', 'Then', 'SemiColon'])) then
+            WriteLn('WARNING: Missing SemiColon before If on line ', Token.Line, ':', Token.Column, '.');
+          Result.Append('if ');
+        end;
+      tk_kw_Label:
         begin
           TempIndent.Append(Indent);
           Result.Append('label ' + Newline((Indent + Length(TempIndent)) * 2));
@@ -534,7 +539,7 @@ begin
         begin
           if (LastToken.Token <> tk_sym_Colon) then
           begin
-            if (not (LastToken.Token.ToStr() in ['Comment', 'SemiColon'])) then
+            if (not (LastToken.Token.ToStr() in ['Comment', 'Directive', 'SemiColon'])) then
             begin
               WriteLn('WARNING: No SemiColon before Procedure at ', Token.Column, ':', Token.Line, '.');
               if (FixWarnings) then
