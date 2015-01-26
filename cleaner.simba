@@ -1,6 +1,7 @@
 program new;
 
 //{$DEFINE DEBUG}
+//{$DEFINE CASE_WARNING}
 {$I parser.simba}
 
 type
@@ -212,6 +213,7 @@ var
   TempName: string;
   TempParser: TParser;
   TempToken: TToken;
+  RecentDirective: Boolean;
 begin
   Parser.Init(Script);
   LineCount := 0;
@@ -225,7 +227,12 @@ begin
   while (Parser.Next() <> tk_NULL) do
   begin
     if (Token.Token <> tk_NewLine) and (Token.Token <> tk_WhiteSpace) then
-      LastToken := Token;
+    begin
+      RecentDirective := Token.Token = tk_Directive;
+      if (Token.Token <> tk_Directive) then
+        LastToken := Token;
+    end;
+
     Token := Parser.getToken();
     
     if (Token.Token <> tk_NewLine) and (Token.Token <> tk_WhiteSpace) then
@@ -268,7 +275,9 @@ begin
 
           if (TempName <> HashArr[iHash][HashIndex]) and (TempNameArr[High(TempNameArr)] <> HashArr[iHash][HashIndex]) then
           begin
+            {$IFDEF CASE_WARNING}
             WriteLn('WARNING: Case mismatch (', TempName, ' <> ', HashArr[iHash][HashIndex], ') on line ', Token.Line, ':', LineCount, '.');
+            {$ENDIF}
             if (FixWarnings) then
             begin
               Token.Data := HashArr[iHash][HashIndex];
@@ -279,7 +288,13 @@ begin
           
           if (LastToken.Token.ToStr() in ['Var', 'Const', 'Type', 'SemiColon', 'Record', 'Union', 'Comment']) then
             Result.Append(Replicate(' ', IdentIndent * 2));
-          
+
+          if (LastToken.Token.ToStr() in ['End']) then
+          begin
+            WriteLn('WARNING: Missing SemiColon before Identifier on line ', Token.Line, ':', LineCount, '.');
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          end;
+
           Result.Append(Trim(Token.Data));
         end;
       tk_typ_Float, tk_typ_Integer, tk_typ_String, tk_typ_Char: Result.Append(Trim(Token.Data));
@@ -308,7 +323,7 @@ begin
         end;
       tk_Directive: 
         begin
-          if ((LastToken.Token <> tk_Directive) and (LastToken.Token <> tk_Comment)) and (not (Length(inMethod) > 0)) then
+          if ((not RecentDirective) and (LastToken.Token <> tk_Comment)) and (not (Length(inMethod) > 0)) then
             Result.Append(Newline((Indent + Length(TempIndent)) * 2));
           Result.Append(Trim(Token.Data) + Newline((Indent + Length(TempIndent)) * 2));
         end;
@@ -393,7 +408,7 @@ begin
             end else
               if (not (Length(inCase) > 0)) then
               begin
-                WriteLn('WARNING: SemiColon before Else at ', Token.Column, ':', Token.Line, '.');
+                WriteLn('WARNING: SemiColon before Else at ', Token.Line, ':', Token.Column, '.');
                 if (FixWarnings) then
                   WriteLn('Not fixed!');
               end;
@@ -406,6 +421,12 @@ begin
         end;
       tk_kw_End: 
         begin
+          if (not (LastToken.Token.ToStr in ['SemiColon'])) then
+          begin
+            WriteLn('WARNING: Missing SemiColon before End at ', Token.Line, ':', Token.Column, '.');
+            Result.Append(Newline((Indent + Length(TempIndent)) * 2));
+          end;
+
           Dec(Indent);
           
           if (Length(inCase) > 0) then
@@ -427,7 +448,7 @@ begin
             if (Length(inMethod) > 0) then
               Dec(Indent);
           end;
-          
+
           Delete(Result, Length(Result) - 1);
           Result.Append(Replicate(' ', IdentIndent * 2) + 'end');
         end;
@@ -685,13 +706,16 @@ begin
         end;
       tk_sym_SemiColon: 
         begin
+          if (LastToken.Token.ToStr() in ['Else']) then
+            WriteLn('WARNING: Empty statement after Else on line ', Token.Line, ':', LineCount, '.');
+
           if (Length(TempIndent) > 0) then
             for TempInt32 := High(TempIndent) downto 0 do
               if (TempIndent[TempInt32] = Indent) then
                 SetLength(TempIndent, Length(TempIndent) - 1)
               else
                 Break;
-          
+
           Result.Append(';');
           if (inPar = 0) then
             Result.Append(Newline((Indent + Length(TempIndent)) * 2))
