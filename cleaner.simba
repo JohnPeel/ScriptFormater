@@ -198,6 +198,11 @@ begin
     Add(DataArr[Temp], iHash, HashIndex);
 end;
 
+procedure Print(Typ, Info: string; Position: TToken);
+begin
+  WriteLn(PadR(' (' + IntToStr(Position.Line) + ':' + IntToStr(Position.Column) + ')', 8), ' |', PadL(Typ, 8), ': ', Info, ' on line ', Position.Line, '.');
+end;
+
 var
   HashArr: THashArr;
 
@@ -241,7 +246,7 @@ begin
     case Token.Token of
       tk_Error: 
         begin
-          WriteLn('ERROR: Found unknown character "', Token.Data, '" at position ', Token.Column, ' on line ', Token.Line, '.');
+          Print('ERROR', 'Found unknown character', Token);
           if (not SkipErrors) then
             Break;
         end;
@@ -276,7 +281,7 @@ begin
           if (TempName <> HashArr[iHash][HashIndex]) and (TempNameArr[High(TempNameArr)] <> HashArr[iHash][HashIndex]) then
           begin
             {$IFDEF CASE_WARNING}
-            WriteLn('WARNING: Case mismatch (', TempName, ' <> ', HashArr[iHash][HashIndex], ') on line ', Token.Line, ':', LineCount, '.');
+            Print('WARNING', 'Case mismatch (' + TempName + ')', Token);
             {$ENDIF}
             if (FixWarnings) then
             begin
@@ -291,7 +296,7 @@ begin
 
           if (LastToken.Token.ToStr() in ['End']) then
           begin
-            WriteLn('WARNING: Missing SemiColon before Identifier on line ', Token.Line, ':', LineCount, '.');
+            Print('WARNING', 'Missing SemiColon before Identifier', Token);
             Result.Append(Newline((Indent + Length(TempIndent)) * 2));
           end;
 
@@ -408,9 +413,9 @@ begin
             end else
               if (not (Length(inCase) > 0)) then
               begin
-                WriteLn('WARNING: SemiColon before Else at ', Token.Line, ':', Token.Column, '.');
+                Print('WARNING', 'Missing SemiColon before Else', Token);
                 if (FixWarnings) then
-                  WriteLn('Not fixed!');
+                  WriteLn('Not fixed!'); //FIXME: Do Ett
               end;
           end else
             Result.Append(' ');
@@ -421,9 +426,9 @@ begin
         end;
       tk_kw_End: 
         begin
-          if (not (LastToken.Token.ToStr in ['SemiColon'])) then
+          if (not (LastToken.Token.ToStr in ['SemiColon', 'Comment', 'Directive'])) then
           begin
-            WriteLn('WARNING: Missing SemiColon before End at ', Token.Line, ':', Token.Column, '.');
+            Print('WARNING', 'Missing SemiColon before End', Token);
             Result.Append(Newline((Indent + Length(TempIndent)) * 2));
           end;
 
@@ -471,7 +476,7 @@ begin
           begin
             if (not (LastToken.Token.ToStr() in ['Comment', 'SemiColon', 'NULL'])) then
             begin
-              WriteLn('WARNING: No SemiColon before Function at ', Token.Column, ':', Token.Line, '.');
+              Print('WARNING', 'Missing SemiColon before Function', Token);
               if (FixWarnings) then
               begin
                 Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
@@ -502,7 +507,7 @@ begin
       tk_kw_If:
         begin
           if (not (LastToken.Token.ToStr() in ['Begin', 'Comment', 'Directive', 'Else', 'Do', 'Of', 'Then', 'SemiColon'])) then
-            WriteLn('WARNING: Missing SemiColon before If on line ', Token.Line, ':', Token.Column, '.');
+            Print('WARNING', 'Missing SemiColon before If', Token);
           Result.Append('if ');
         end;
       tk_kw_Label:
@@ -541,7 +546,7 @@ begin
           begin
             if (not (LastToken.Token.ToStr() in ['Comment', 'Directive', 'SemiColon'])) then
             begin
-              WriteLn('WARNING: No SemiColon before Procedure at ', Token.Column, ':', Token.Line, '.');
+              Print('WARNING', 'Missing SemiColon before Procedure', Token);
               if (FixWarnings) then
               begin
                 Delete(Result, Length(Result) - (((Indent + Length(TempIndent)) * 2) + 1));
@@ -712,7 +717,7 @@ begin
       tk_sym_SemiColon: 
         begin
           if (LastToken.Token.ToStr() in ['Else']) then
-            WriteLn('WARNING: Empty statement after Else on line ', Token.Line, ':', LineCount, '.');
+            Print('WARNING', 'Empty statement after Else', Token);
 
           if (Length(TempIndent) > 0) then
             for TempInt32 := High(TempIndent) downto 0 do
@@ -731,7 +736,7 @@ begin
   end;
   
   if (Indent <> 0) then
-    WriteLn('WARNING: Script didn''t end with an Indent level of 0.');
+    Print('FATAL ERROR', 'Indent level is not 0', Token);
 end;
 
 var
