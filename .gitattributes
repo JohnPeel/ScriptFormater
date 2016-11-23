@@ -1,1 +1,5 @@
 * text=auto
+
+*.simba linguist-language=Pascal
+*.sex linguist-language=Pascal
+*.sei linguist-language=Pascal
